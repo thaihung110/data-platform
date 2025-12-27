@@ -1,0 +1,124 @@
+# Documentation (keep only specific docs)
+docs/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/webserver_config.py
+airflow/unittests.cfg
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# Secrets and credentials
+*.key
+*.pem
+*.crt
+*.p12
+*.jks
+*-secret.yaml
+secrets/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# Helm
+charts/*.tgz
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+.cache/
+tmp/
+
+# Data files (exclude from git)
+*.csv
+*.parquet
+*.avro
+*.json.gz
+data/
+raw/
+bronze/
+silver/
+gold/
+
+# Docker
+.dockerignore
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Node modules (if any frontend)
+node_modules/
