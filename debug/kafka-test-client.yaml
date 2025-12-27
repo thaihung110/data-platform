@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka-test-client
+  namespace: default
+  labels:
+    app: kafka-test-client
+spec:
+  containers:
+    - name: kafka-client
+      image: bitnamilegacy/kafka:4.0.0-debian-12-r10
+      command:
+        - sleep
+        - "86400" # Sleep for 24 hours
+      env:
+        # Kafka broker connection
+        - name: KAFKA_BROKER
+          value: "openhouse-kafka:9092"
+        # SASL authentication
+        - name: KAFKA_SASL_MECHANISM
+          value: "PLAIN"
+        - name: KAFKA_SASL_USERNAME
+          value: "admin"
+        - name: KAFKA_SASL_PASSWORD
+          value: "admin"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+  restartPolicy: Always

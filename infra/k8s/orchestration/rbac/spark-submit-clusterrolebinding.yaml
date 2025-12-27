@@ -1,0 +1,20 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spark-submit-binding
+  labels:
+    app: airflow
+    component: spark-submit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: spark-submit-role
+subjects:
+  # ServiceAccount for submitting Spark jobs (KubernetesPodOperator)
+  - kind: ServiceAccount
+    name: openhouse-spark-operator-spark
+    namespace: default
+  # ServiceAccount for monitoring Spark jobs (SparkKubernetesSensor in worker pods)
+  - kind: ServiceAccount
+    name: openhouse-airflow-worker
+    namespace: default

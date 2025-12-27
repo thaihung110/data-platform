@@ -1,0 +1,281 @@
+---
+# Source: openfga/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openhouse-openfga-datastore-secret
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+data:
+  uri: "cG9zdGdyZXNxbDovL29wZW5mZ2E6b3BlbmZnYUBvcGVuaG91c2UtcG9zdGdyZXNxbC1wcmltYXJ5OjU0MzIvb3BlbmZnYQ=="
+---
+# Source: openfga/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openhouse-openfga
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - name: grpc
+      port: 8081
+      targetPort: grpc
+      protocol: TCP
+    - name: http 
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: playground
+      port: 3000
+      targetPort: playground
+      protocol: TCP
+    - name: metrics
+      port: 2112
+      targetPort: metrics
+      protocol: TCP
+
+  selector:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+---
+# Source: openfga/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openhouse-openfga
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openfga
+      app.kubernetes.io/instance: openhouse-openfga
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "2112"
+      labels:
+        app.kubernetes.io/name: openfga
+        app.kubernetes.io/instance: openhouse-openfga
+    spec:
+      serviceAccountName: default
+      securityContext:
+        {}
+      
+      initContainers:
+        - name: migrate-database
+          securityContext:
+            {}
+          image: "hub.vtcc.vn:8989/openfga/openfga:v1.8.16"
+          args: [ "migrate" ]
+          env:
+            - name: OPENFGA_DATASTORE_ENGINE
+              value: "postgres"
+            - name: OPENFGA_DATASTORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: "openhouse-openfga-datastore-secret"
+                  key: "uri"
+          resources:
+            {}
+      containers:
+        - name: openfga
+          securityContext:
+            {}
+          image: "hub.vtcc.vn:8989/openfga/openfga:v1.8.16"
+          imagePullPolicy: Always
+          args: ["run"]
+          ports:
+            - name: grpc
+              containerPort: 8081
+
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+            - name: profiler
+              containerPort: 3001
+              protocol: TCP
+
+            - name: playground
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 2112
+              protocol: TCP
+
+          env:
+            - name: OPENFGA_DATASTORE_ENGINE
+              value: "postgres"
+            - name: OPENFGA_DATASTORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: "openhouse-openfga-datastore-secret"
+                  key: "uri"
+            - name: OPENFGA_GRPC_ADDR
+              value: "0.0.0.0:8081"
+
+            - name: OPENFGA_HTTP_ENABLED
+              value: "true"
+            - name: OPENFGA_HTTP_ADDR
+              value: "0.0.0.0:8080"
+            - name: OPENFGA_HTTP_CORS_ALLOWED_ORIGINS
+              value: "*"
+            - name: OPENFGA_HTTP_CORS_ALLOWED_HEADERS
+              value: "*"
+
+            - name: OPENFGA_PLAYGROUND_ENABLED
+              value: "true"
+            - name: OPENFGA_PLAYGROUND_PORT
+              value: "3000"
+            - name: OPENFGA_LOG_FORMAT
+              value: json
+            - name: OPENFGA_LOG_LEVEL
+              value: info
+            - name: OPENFGA_LOG_TIMESTAMP_FORMAT
+              value: Unix
+            - name: OPENFGA_REQUEST_DURATION_DATASTORE_QUERY_COUNT_BUCKETS
+              value: "50,200"
+
+            - name: OPENFGA_METRICS_ENABLED
+              value: "true"
+            - name: OPENFGA_METRICS_ADDR
+              value: "0.0.0.0:2112"
+          readinessProbe:
+            failureThreshold: 6
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            grpc:
+              port: 8081
+          livenessProbe:
+            failureThreshold: 12
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            grpc:
+              port: 8081
+
+          resources:
+            {}
+---
+# Source: openfga/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openhouse-openfga
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  rules:
+    - host: "openhouse.openfga.dev"
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: openhouse-openfga
+                port:
+                  number: 8080
+---
+# Source: openfga/templates/tests/test-auth-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-auth-secret
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "-5"  # Ensure secret is created before the test pod
+type: Opaque
+data:
+  keys: dGVzdC1rZXktMSx0ZXN0LWtleS0y
+---
+# Source: openfga/templates/tests/test-auth-secret.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "openhouse-openfga-test-auth-secret"
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: test-auth
+      image: "busybox" 
+      command: 
+        - "/bin/sh"
+        - "-ec"  # Adding -e to fail on error, -c to run command
+        - |
+          echo "Starting auth secret test..."
+          
+          # Check if secret is mounted
+          if [ -z "$OPENFGA_AUTHN_PRESHARED_KEYS_SECRET" ]; then
+            echo "ERROR: OPENFGA_AUTHN_PRESHARED_KEYS_SECRET environment variable is not set"
+            exit 1
+          fi
+          
+          echo "Secret environment variable is set to: $OPENFGA_AUTHN_PRESHARED_KEYS_SECRET"
+          echo "Test completed successfully"
+      env:
+        - name: OPENFGA_AUTHN_PRESHARED_KEYS_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: test-auth-secret
+              key: keys
+  restartPolicy: Never
+---
+# Source: openfga/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "openhouse-openfga-test-connection"
+  labels:
+    helm.sh/chart: openfga-0.2.35
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: openhouse-openfga
+    app.kubernetes.io/version: "v1.8.16"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: grpc-health-probe
+      image: "hub.vtcc.vn:8989/openfga/openfga:v1.8.16"
+      imagePullPolicy: Always
+      command: ["grpc_health_probe", '-addr=openhouse-openfga:8081']
+  restartPolicy: Never

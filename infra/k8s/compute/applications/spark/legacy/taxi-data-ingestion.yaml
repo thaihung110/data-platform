@@ -1,0 +1,138 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: taxi-data-ingestion
+  namespace: default
+  labels:
+    app: taxi-data-ingestion
+    component: etl
+spec:
+  type: Python
+  mode: cluster
+  pythonVersion: "3"
+  sparkVersion: "3.5.0"
+
+  # Spark image with Python support and application code
+  # Build and push using: cd spark-jobs && ./build-image.sh
+  # Image is available at: https://hub.docker.com/r/hungvt0110/ingestion-job
+  image: hungvt0110/ingestion-job:latest
+
+  imagePullPolicy: Always
+
+  # Main Python application file (inside the image)
+  mainApplicationFile: local:///app/ingest_taxi_data.py
+
+  # Arguments to pass to the Python script
+  arguments:
+    - "s3a://raw/taxi/*/*.parquet" # Read all parquet chunks from NiFi
+    - "bronze"
+    - "taxi_trips"
+
+  # Spark configuration
+  # Note: Most Iceberg/lakekeeper configs are set in Python code (ingest_taxi_data.py)
+  # Only set configs here that must be set before SparkSession creation
+  sparkConf:
+    # JARs packages - must be set before SparkSession creation
+    "spark.jars.packages": "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2,org.apache.iceberg:iceberg-aws-bundle:1.5.2,org.apache.hadoop:hadoop-aws:3.3.4"
+    # Ivy cache to /tmp (always writable in pods)
+    "spark.jars.ivy": "/tmp/.ivy2"
+
+  # Hadoop configuration for MinIO (S3-compatible)
+  hadoopConf:
+    "fs.s3a.endpoint": "http://openhouse-minio:9000"
+    "fs.s3a.path.style.access": "true"
+    "fs.s3a.connection.ssl.enabled": "false"
+    "fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+
+  # Driver configuration
+  driver:
+    cores: 1
+    coreLimit: "1200m"
+    memory: "2g"
+    memoryOverhead: "512m"
+    labels:
+      version: 3.5.0
+    serviceAccount: openhouse-spark-operator-spark
+    env:
+      # Set HOME to /tmp for writable ivy cache
+      - name: HOME
+        value: "/tmp"
+      # Spark and Iceberg versions (used by Python code to build packages string)
+      - name: SPARK_MINOR_VERSION
+        value: "3.5"
+      - name: ICEBERG_VERSION
+        value: "1.5.2"
+      # Lakekeeper catalog configuration (matches defaults in ingest_taxi_data.py)
+      - name: CATALOG_URL
+        value: "http://openhouse-lakekeeper:8181/catalog"
+      - name: CLIENT_ID
+        value: "spark"
+      - name: CLIENT_SECRET
+        value: "3FfkvrupMYsojoT2RnXqknvjCsljwFWl"
+      - name: WAREHOUSE
+        value: "bronze"
+      - name: KEYCLOAK_TOKEN_ENDPOINT
+        value: "http://openhouse-keycloak:80/realms/iceberg/protocol/openid-connect/token"
+      # MinIO credentials
+      - name: AWS_ACCESS_KEY_ID
+        value: "admin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "admin123"
+
+  # Executor configuration
+  executor:
+    cores: 2
+    instances: 3
+    memory: "4g"
+    memoryOverhead: "1g"
+    labels:
+      version: 3.5.0
+    env:
+      # Set HOME to /tmp for writable ivy cache
+      - name: HOME
+        value: "/tmp"
+      # Spark and Iceberg versions (used by Python code to build packages string)
+      - name: SPARK_MINOR_VERSION
+        value: "3.5"
+      - name: ICEBERG_VERSION
+        value: "1.5.2"
+      # Lakekeeper catalog configuration (matches defaults in ingest_taxi_data.py)
+      - name: CATALOG_URL
+        value: "http://openhouse-lakekeeper:8181/catalog"
+      - name: CLIENT_ID
+        value: "spark"
+      - name: CLIENT_SECRET
+        value: "3FfkvrupMYsojoT2RnXqknvjCsljwFWl"
+      - name: WAREHOUSE
+        value: "bronze"
+      - name: KEYCLOAK_TOKEN_ENDPOINT
+        value: "http://openhouse-keycloak:80/realms/iceberg/protocol/openid-connect/token"
+      # MinIO credentials
+      - name: AWS_ACCESS_KEY_ID
+        value: "admin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "admin123"
+
+  # Dependencies
+  # Data files are included in the Docker image, no need to specify here
+  deps: {}
+
+  # Restart policy
+  restartPolicy:
+    type: Never
+    onFailureRetries: 2
+    onFailureRetryInterval: 10
+    onSubmissionFailureRetries: 3
+    onSubmissionFailureRetryInterval: 20
+
+  # Time to live after completion
+  timeToLiveSeconds: 3600
+
+  # Monitoring - disabled for now (JMX exporter not in image)
+  # monitoring:
+  #   exposeDriverMetrics: true
+  #   exposeExecutorMetrics: true
+  #   prometheus:
+  #     jmxExporterJar: "/prometheus/jmx_prometheus_javaagent-0.16.1.jar"
+  #     port: 8090

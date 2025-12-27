@@ -1,0 +1,82 @@
+Name:             openhouse-lakekeeper-6db5949db8-gntpw
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             <none>
+Labels:           app.kubernetes.io/component=catalog
+                  app.kubernetes.io/instance=openhouse-lakekeeper
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/name=lakekeeper
+                  app.kubernetes.io/part-of=lakekeeper
+                  app.kubernetes.io/version=0.9.3
+                  helm.sh/chart=lakekeeper-0.7.1
+                  pod-template-hash=6db5949db8
+Annotations:      checksum/secret-config-envs: 857812db343b6060a8d0674077abb8f245d6a1a719ae433ec6527786c615d753
+                  cluster-autoscaler.kubernetes.io/safe-to-evict: true
+Status:           Pending
+IP:               
+IPs:              <none>
+Controlled By:    ReplicaSet/openhouse-lakekeeper-6db5949db8
+Init Containers:
+  check-db:
+    Image:      quay.io/lakekeeper/catalog:v0.9.5
+    Port:       <none>
+    Host Port:  <none>
+    Args:
+      wait-for-db
+      -dm
+      -r
+      100
+      -b
+      2
+    Limits:
+      memory:  1Gi
+    Requests:
+      memory:  128Mi
+    Environment Variables from:
+      openhouse-lakekeeper-config-envs  Secret  Optional: false
+    Environment:
+      ICEBERG_REST__PG_ENCRYPTION_KEY:  <set to the key 'encryptionKey' in secret 'openhouse-lakekeeper-postgres-encryption'>  Optional: false
+      ICEBERG_REST__PLACEHOLDER:        placeholder
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-mnkq7 (ro)
+Containers:
+  lakekeeper:
+    Image:       quay.io/lakekeeper/catalog:v0.9.5
+    Ports:       8181/TCP, 9000/TCP
+    Host Ports:  0/TCP, 0/TCP
+    Args:
+      serve
+    Limits:
+      memory:  10Gi
+    Requests:
+      memory:   128Mi
+    Liveness:   http-get http://:8181/health delay=1s timeout=5s period=5s #success=1 #failure=5
+    Readiness:  http-get http://:8181/health delay=1s timeout=5s period=5s #success=1 #failure=5
+    Environment Variables from:
+      openhouse-lakekeeper-config-envs  Secret  Optional: false
+    Environment:
+      ICEBERG_REST__PG_ENCRYPTION_KEY:  <set to the key 'encryptionKey' in secret 'openhouse-lakekeeper-postgres-encryption'>  Optional: false
+      ICEBERG_REST__PLACEHOLDER:        placeholder
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-mnkq7 (ro)
+Conditions:
+  Type           Status
+  PodScheduled   False 
+Volumes:
+  kube-api-access-mnkq7:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age                From               Message
+  ----     ------            ----               ----               -------
+  Warning  FailedScheduling  25m                default-scheduler  0/1 nodes are available: 1 Insufficient memory. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod.
+  Warning  FailedScheduling  20m                default-scheduler  0/1 nodes are available: 1 Insufficient memory. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod.
+  Warning  FailedScheduling  13m (x2 over 17m)  default-scheduler  0/1 nodes are available: 1 Insufficient memory. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod.

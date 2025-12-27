@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+aiofiles
+confluent-kafka
+pydantic-settings
+pydantic
+pytest
+httpx
+sqlalchemy
+psycopg2-binary

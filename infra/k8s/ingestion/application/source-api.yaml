@@ -1,0 +1,218 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: source-api-config
+  namespace: default
+data:
+  # Kafka Configuration
+  KAFKA_BROKER: "openhouse-kafka:9092"
+  KAFKA_TOPIC_INGEST: "csv-ingestion"
+  KAFKA_PARTITIONS: "1"
+  # File Processing
+  CHUNK_SIZE_MB: "50"
+  CHUNK_TYPE: "size"
+  CHUNK_ROWS: "10000"
+  MAX_CHUNKS: "100"
+  MAX_FILE_SIZE_MB: "5000"
+  # Temporary Storage
+  TEMP_DIR: "/tmp/csv-chunks"
+  CLEANUP_AFTER_HOURS: "24"
+  # API Configuration
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  BASE_URL: "http://fastapi-csv-uploader:8000"
+  # Database Configuration
+  DATABASE_HOST: "openhouse-postgresql-primary"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "source_api"
+  DATABASE_USER: "source_api"
+  DATABASE_PASSWORD: "source_api"
+  KAFKA_SASL_MECHANISM: "PLAIN"
+  KAFKA_SASL_USERNAME: "admin"
+  KAFKA_SASL_PASSWORD: "admin"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csv-chunks-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-csv-uploader
+  namespace: default
+  labels:
+    app: fastapi-csv-uploader
+    component: data-ingestion
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: fastapi-csv-uploader
+  template:
+    metadata:
+      labels:
+        app: fastapi-csv-uploader
+        component: data-ingestion
+    spec:
+      containers:
+        - name: api
+          image: hungvt0110/fastapi-csv-uploader:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          env:
+            - name: KAFKA_BROKER
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: KAFKA_BROKER
+            - name: KAFKA_TOPIC_INGEST
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: KAFKA_TOPIC_INGEST
+            - name: KAFKA_PARTITIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: KAFKA_PARTITIONS
+            - name: CHUNK_SIZE_MB
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: CHUNK_SIZE_MB
+            - name: CHUNK_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: CHUNK_TYPE
+            - name: CHUNK_ROWS
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: CHUNK_ROWS
+            - name: TEMP_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: TEMP_DIR
+            - name: API_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: API_HOST
+            - name: API_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: API_PORT
+            - name: BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: BASE_URL
+            - name: DATABASE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: DATABASE_HOST
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: DATABASE_PORT
+            - name: DATABASE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: DATABASE_NAME
+            - name: DATABASE_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: DATABASE_USER
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: DATABASE_PASSWORD
+            - name: KAFKA_SASL_MECHANISM
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: KAFKA_SASL_MECHANISM
+            - name: KAFKA_SASL_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: KAFKA_SASL_USERNAME
+            - name: KAFKA_SASL_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: source-api-config
+                  key: KAFKA_SASL_PASSWORD
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: csv-chunks
+              mountPath: /tmp/csv-chunks
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: csv-chunks
+          persistentVolumeClaim:
+            claimName: csv-chunks-pvc
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-csv-uploader
+  namespace: default
+  labels:
+    app: fastapi-csv-uploader
+spec:
+  type: ClusterIP
+  selector:
+    app: fastapi-csv-uploader
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http

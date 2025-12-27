@@ -1,0 +1,9 @@
+dependencies:
+- name: postgresql
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 16.7.26
+- name: openfga
+  repository: https://openfga.github.io/helm-charts
+  version: 0.2.35
+digest: sha256:4003078611c159ea8f67b3f94cf16b7c60b21ec40fec3027d3ed858d63001431
+generated: "2025-08-15T08:17:07.05590084Z"

@@ -1,0 +1,386 @@
+---
+# Source: lakekeeper/templates/config/db-encryption-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openhouse-lakekeeper-postgres-encryption
+  annotations:
+    helm.sh/resource-policy: "keep"
+  labels:
+    app.kubernetes.io/component: config
+type: Opaque
+data:
+  encryptionKey: "elZZYWVFWExPb3ZiUENiM2tQeWNYZVFrNHh1ckhWSFdJc0dVUWpkTw=="
+---
+# Source: lakekeeper/templates/config/secret-config-envs.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openhouse-lakekeeper-config-envs
+  labels:
+    helm.sh/chart: lakekeeper-0.7.1
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/version: "0.9.3"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: lakekeeper
+    app.kubernetes.io/component: config
+data:
+  # Database Configs
+  ICEBERG_REST__PG_HOST_R: "b3BlbmhvdXNlLXBvc3RncmVzcWwtcmVhZA=="
+  ICEBERG_REST__PG_HOST_W: "b3BlbmhvdXNlLXBvc3RncmVzcWwtcHJpbWFyeQ=="
+  ICEBERG_REST__PG_PORT: "NTQzMg=="
+  ICEBERG_REST__PG_DATABASE: "Y2F0YWxvZw=="
+  ICEBERG_REST__PG_USER: "Y2F0YWxvZw=="
+  ICEBERG_REST__PG_PASSWORD: "Y2F0YWxvZw=="
+
+  # OPENID Auth Configs
+  LAKEKEEPER__OPENID_PROVIDER_URI: "aHR0cDovL29wZW5ob3VzZS1rZXljbG9hay9yZWFsbXMvaWNlYmVyZw=="
+  LAKEKEEPER__OPENID_AUDIENCE: "bGFrZWtlZXBlcg=="
+  # .Values.auth.oauth2.additionalIssuers is a list.
+  # If it is not empty, join the list with a comma and set the value to LAKEKEEPER__OPENID_ADDITIONAL_ISSUERS
+  LAKEKEEPER__OPENID_ADDITIONAL_ISSUERS: "aHR0cHM6Ly9vcGVuaG91c2Uua2V5Y2xvYWsuZGV2L3JlYWxtcy9pY2ViZXJnLGh0dHA6Ly9vcGVuaG91c2Uta2V5Y2xvYWsvcmVhbG1zL2ljZWJlcmc="
+
+  # UI Auth configs
+  LAKEKEEPER__UI__OPENID_CLIENT_ID: "bGFrZWtlZXBlcg=="
+
+  # Kubernetes Auth Configs  
+
+  # Secret store configs
+  ICEBERG_REST__SECRET_BACKEND: "UG9zdGdyZXM="
+  # ICEBERG_REST__PG_ENCRYPTION_KEY is mounted as secret
+
+  # Authorization configs
+  LAKEKEEPER__AUTHZ_BACKEND: "b3BlbmZnYQ=="
+  LAKEKEEPER__OPENFGA__ENDPOINT: "aHR0cDovL29wZW5ob3VzZS1vcGVuZmdhOjgwODE="
+
+  # User Configs
+  "LAKEKEEPER__UI__OPENID_PROVIDER_URI": "aHR0cHM6Ly9vcGVuaG91c2Uua2V5Y2xvYWsuZGV2L3JlYWxtcy9pY2ViZXJn"
+---
+# Source: lakekeeper/templates/catalog/catalog-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openhouse-lakekeeper
+  labels:
+    helm.sh/chart: lakekeeper-0.7.1
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/version: "0.9.3"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: lakekeeper
+    app.kubernetes.io/component: catalog
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+    - port: 8181
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/component: catalog
+---
+# Source: lakekeeper/templates/catalog/catalog-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openhouse-lakekeeper
+  labels:
+    helm.sh/chart: lakekeeper-0.7.1
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/version: "0.9.3"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: lakekeeper
+    app.kubernetes.io/component: catalog
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lakekeeper
+      app.kubernetes.io/instance: openhouse-lakekeeper
+      app.kubernetes.io/component: catalog
+  template:
+    metadata:
+      annotations:
+        checksum/secret-config-envs: 53043ec641f04be8f159bf462d97c930c92e2d8b74bc1105b27c5c64dcfb210f
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+      labels:
+        helm.sh/chart: lakekeeper-0.7.1
+        app.kubernetes.io/name: lakekeeper
+        app.kubernetes.io/instance: openhouse-lakekeeper
+        app.kubernetes.io/version: "0.9.3"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: lakekeeper
+        app.kubernetes.io/component: catalog
+    spec:
+      restartPolicy: Always
+      serviceAccountName: default
+      initContainers:        
+        
+        - name: check-db  
+          image: hub.vtcc.vn:8989/lakekeeper/catalog:v0.9.5
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65534
+          resources:
+            limits:
+              memory: 1024Mi
+            requests:
+              memory: 128Mi
+          envFrom:    
+            - secretRef:
+                name: openhouse-lakekeeper-config-envs
+          env:    
+            - name: ICEBERG_REST__PG_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openhouse-lakekeeper-postgres-encryption
+                  key: encryptionKey
+            
+            - name: ICEBERG_REST__PLACEHOLDER
+              value: "placeholder"
+          args:
+            - wait-for-db
+            - -dm
+            - -r
+            - "100"
+            - -b
+            - "2"
+      containers:
+        - name: lakekeeper          
+          image: hub.vtcc.vn:8989/lakekeeper/catalog:v0.9.5
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65534
+          env:            
+            - name: ICEBERG_REST__PG_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openhouse-lakekeeper-postgres-encryption
+                  key: encryptionKey
+            
+            - name: ICEBERG_REST__PLACEHOLDER
+              value: "placeholder"
+          envFrom:            
+            - secretRef:
+                name: openhouse-lakekeeper-config-envs
+          ports:
+            - name: http
+              containerPort: 8181
+              protocol: TCP
+            - name: metrics
+              containerPort: 9000
+              protocol: TCP
+          args:
+            - serve
+          livenessProbe:
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            failureThreshold: 5
+            timeoutSeconds: 5
+            httpGet:
+              path: /health
+              port: 8181
+          readinessProbe:
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            failureThreshold: 5
+            timeoutSeconds: 5
+            httpGet:
+              path: /health
+              port: 8181
+          resources:
+            limits:
+              memory: 10Gi
+            requests:
+              memory: 128Mi
+---
+# Source: lakekeeper/templates/catalog/catalog-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openhouse-lakekeeper
+  labels:
+    helm.sh/chart: lakekeeper-0.7.1
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/version: "0.9.3"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: lakekeeper
+    app.kubernetes.io/component: catalog
+spec:
+  tls:
+    - hosts:
+        - openhouse.lakekeeper.dev
+      secretName: lakekeeper-catalog-tls
+  ingressClassName: nginx
+  rules:
+    - host: openhouse.lakekeeper.dev
+      http:
+        paths:
+          - path: 
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: openhouse-lakekeeper
+                port:
+                  name: http
+---
+# Source: lakekeeper/templates/tests/bootstrap.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "openhouse-lakekeeper-test-bootstrap"
+  labels:
+    helm.sh/chart: lakekeeper-0.7.1
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/version: "0.9.3"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: lakekeeper
+    component: catalog
+  annotations:
+    "helm.sh/hook": test
+spec:
+  serviceAccountName: default
+  containers:
+    - name: base
+      image: hub.vtcc.vn:8989/nicolaka/netshoot
+      command: ['bash', "-c"]
+      args:
+        - |
+          set -e
+
+
+          TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          BOOTSTRAP_URL="http://openhouse-lakekeeper:8181/management/v1/bootstrap"
+          if [ -n "$TOKEN" ]; then
+            echo "Found K8s Service Account token"
+          else
+            echo "No K8s Service Account token found"
+          fi
+          for i in {1..45}; do
+            RESPONSE=$(curl --location "$BOOTSTRAP_URL" \
+              --header 'Content-Type: application/json' \
+              --header "Authorization: Bearer $TOKEN" \
+              --data '{"accept-terms-of-use": true}' \
+              --write-out "HTTP_CODE:%{http_code}" --silent --output /dev/null)
+
+            if [[ "$RESPONSE" == *"HTTP_CODE:204"* ]]; then
+              echo "Bootstrapping successful"
+              exit 0
+            else
+              echo "Request failed with status code and response: $RESPONSE"
+            fi
+
+            sleep 2
+          done
+          echo "Failed to bootstrap within the given time"
+          exit 1
+  restartPolicy: Never
+---
+# Source: lakekeeper/templates/db-migration.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openhouse-lakekeeper-db-migration-1
+  labels:
+    helm.sh/chart: lakekeeper-0.7.1
+    app.kubernetes.io/name: lakekeeper
+    app.kubernetes.io/instance: openhouse-lakekeeper
+    app.kubernetes.io/version: "0.9.3"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: lakekeeper
+    app.kubernetes.io/component: db-migration
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "0"
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-100"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  template:
+    metadata:
+      name: "openhouse-lakekeeper-migration"
+      annotations:
+        checksum/secret-config-envs: 53043ec641f04be8f159bf462d97c930c92e2d8b74bc1105b27c5c64dcfb210f
+      labels:
+        helm.sh/chart: lakekeeper-0.7.1
+        app.kubernetes.io/name: lakekeeper
+        app.kubernetes.io/instance: openhouse-lakekeeper
+        app.kubernetes.io/version: "0.9.3"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: lakekeeper
+        app.kubernetes.io/component: db-migration
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: default
+      initContainers:        
+        
+        - name: check-db  
+          image: hub.vtcc.vn:8989/lakekeeper/catalog:v0.9.5
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65534
+          resources:
+            limits:
+              memory: 1024Mi
+            requests:
+              memory: 128Mi
+          envFrom:    
+            - secretRef:
+                name: openhouse-lakekeeper-config-envs
+          env:    
+            - name: ICEBERG_REST__PG_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openhouse-lakekeeper-postgres-encryption
+                  key: encryptionKey
+            
+            - name: ICEBERG_REST__PLACEHOLDER
+              value: "placeholder"
+          args:
+            - wait-for-db
+            - -d
+            - -r
+            - "100"
+            - -b
+            - "2"
+      containers:
+        - name: migration          
+          image: hub.vtcc.vn:8989/lakekeeper/catalog:v0.9.5
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65534
+          env:            
+            - name: ICEBERG_REST__PG_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openhouse-lakekeeper-postgres-encryption
+                  key: encryptionKey
+            
+            - name: ICEBERG_REST__PLACEHOLDER
+              value: "placeholder"
+          envFrom:            
+            - secretRef:
+                name: openhouse-lakekeeper-config-envs
+          args:
+            - migrate
+          resources:
+            limits:
+              memory: 1024Mi
+            requests:
+              memory: 128Mi

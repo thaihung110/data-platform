@@ -1,0 +1,44 @@
+# Environment files (managed via Kubernetes ConfigMap)
+.env
+.env.example
+.env.local
+.env.*.local
+
+# Python cache
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+
+# Kubernetes manifests (not needed in container)
+kubernetes/
+*.yaml
+*.yml
+!requirements.txt
