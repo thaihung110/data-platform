@@ -1,6 +1,0 @@
-{
-  "git.ignoreLimitWarning": true,
-  "yaml.schemas": {
-    "kubernetes://schema/apps/v1%40deployment": "file:///d%3A/data-platform/infra/k8s/ingestion/application/source-api.yaml"
-  }
-}
